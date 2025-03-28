@@ -8,6 +8,9 @@ from typing import Any
 import logfire
 from httpx import AsyncClient
 
+from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
+
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.openai import OpenAIModel
 
@@ -17,6 +20,8 @@ from pydantic_ai.messages import (
 )
 
 from typing import Annotated, List
+
+logfire.configure(send_to_logfire=os.environ.get('LOGFIRE_TOKEN'))
 
 
 client = OpenAIModel(
@@ -32,11 +37,11 @@ chatbot_agent = Agent(
     )
 
 async def main():
+    
+    chat_history : Annotated[List[bytes], lambda x, y: x + y] =  []
+    message_history: list[ModelMessage] = []
+
     while True:
-        
-        chat_history : Annotated[List[bytes], lambda x, y: x + y] =  []
-        message_history: list[ModelMessage] = []
-        
         for message_row in chat_history:
             message_history.extend(ModelMessagesTypeAdapter.validate_json(message_row))
         
@@ -44,7 +49,6 @@ async def main():
         user_input = input("You: ")
     
         async with chatbot_agent.run_stream(user_input, message_history = message_history) as result:
-
             async for text in result.stream_text():
                 print(text)
 
